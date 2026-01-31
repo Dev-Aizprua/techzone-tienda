@@ -1,0 +1,536 @@
+// ============================================
+// CONFIGURACIÓN INICIAL
+// ============================================
+const SHEET_ID = '1eo2E8Ln0sGr_vjwp8-2YNLAlVIuH06F4HXeq_LecrAs';
+const LOGO_URL = 'https://i.postimg.cc/8zRp0Prq/Logo-Tienda-de-articulos-Tecnologicos.png';
+
+const EMPRESA = {
+  nombre: 'TechZone',
+  slogan: 'Tu mundo digital',
+  direccion: 'Ciudad de Panamá, Panamá',
+  telefono: '+507 6423-0862',
+  email: 'info@techzone.com',
+  emailDueno: 'eduardo.aizpruap@gmail.com'
+};
+
+// ============================================
+// FUNCIÓN PRINCIPAL - Servir la página web
+// ============================================
+function doGet(e) {
+  try {
+    const template = HtmlService.createHtmlOutputFromFile('Index');
+    return template
+      .setTitle('TechZone - Tecnología & Accesorios')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } catch (error) {
+    return HtmlService.createHtmlOutput('Error: ' + error.toString());
+  }
+}
+
+// ============================================
+// INICIALIZAR HOJAS DE GOOGLE SHEETS
+// ============================================
+function inicializarHojas() {
+  try {
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    
+    // Crear hoja de Productos
+    let hojaProductos = ss.getSheetByName('Productos');
+    if (!hojaProductos) {
+      hojaProductos = ss.insertSheet('Productos');
+    }
+    
+    // Verificar si ya tiene datos
+    const primeraFila = hojaProductos.getRange('A1').getValue();
+    if (!primeraFila || primeraFila !== 'ID') {
+      // Limpiar hoja y crear cabeceras
+      hojaProductos.clear();
+      hojaProductos.getRange('A1:J1').setValues([[
+        'ID', 'Nombre', 'Descripción', 'Precio Base', 'Categoría', 'Imagen URL', 'Stock', 'Destacado', 'ITBMS %', 'Costo'
+      ]]);
+      hojaProductos.getRange('A1:J1').setFontWeight('bold').setBackground('#0a1628');
+      hojaProductos.getRange('A1:J1').setFontColor('#00d4ff');
+      hojaProductos.setFrozenRows(1);
+      
+      // Ajustar ancho de columnas
+      hojaProductos.setColumnWidth(1, 80);   // ID
+      hojaProductos.setColumnWidth(2, 280);  // Nombre
+      hojaProductos.setColumnWidth(3, 350);  // Descripción
+      hojaProductos.setColumnWidth(4, 100);  // Precio Base
+      hojaProductos.setColumnWidth(5, 120);  // Categoría
+      hojaProductos.setColumnWidth(6, 350);  // Imagen URL
+      hojaProductos.setColumnWidth(7, 80);   // Stock
+      hojaProductos.setColumnWidth(8, 90);   // Destacado
+      hojaProductos.setColumnWidth(9, 80);   // ITBMS %
+      hojaProductos.setColumnWidth(10, 100); // Costo
+      
+      // Datos de ejemplo - Tecnología con imágenes reales
+      const datosEjemplo = [
+        ['TZ001', 'iPhone 15 Pro Max 256GB', 'Smartphone Apple con chip A17 Pro, pantalla Super Retina XDR 6.7 pulgadas, cámara 48MP con zoom óptico 5x', 1299.00, 'Celulares', 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=500&h=500&fit=crop', 8, 'Sí', 7, 950.00],
+        ['TZ002', 'Samsung Galaxy S24 Ultra 256GB', 'Smartphone Samsung con S Pen incluido, pantalla Dynamic AMOLED 2X 6.8 pulgadas, cámara 200MP', 1199.00, 'Celulares', 'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=500&h=500&fit=crop', 10, 'Sí', 7, 850.00],
+        ['TZ003', 'iPhone 14 128GB', 'Smartphone Apple con chip A15 Bionic, pantalla Super Retina XDR 6.1 pulgadas, sistema de cámara dual 12MP', 699.00, 'Celulares', 'https://images.unsplash.com/photo-1678685888221-cda773a3dcdb?w=500&h=500&fit=crop', 15, 'No', 7, 520.00],
+        ['TZ004', 'Samsung Galaxy A54 5G', 'Smartphone Samsung con pantalla Super AMOLED 6.4 pulgadas, cámara triple 50MP, batería 5000mAh', 449.00, 'Celulares', 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=500&h=500&fit=crop', 20, 'No', 7, 320.00],
+        ['TZ005', 'Apple Watch Series 9 45mm', 'Smartwatch con chip S9, pantalla Retina LTPO OLED always-on, GPS + Cellular, resistente al agua 50m', 429.00, 'Smartwatch', 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=500&h=500&fit=crop', 12, 'Sí', 7, 320.00],
+        ['TZ006', 'Samsung Galaxy Watch 6 Classic 47mm', 'Smartwatch con bisel giratorio clásico, monitor de salud avanzado, GPS integrado, compatible Android', 349.00, 'Smartwatch', 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=500&h=500&fit=crop', 14, 'No', 7, 250.00],
+        ['TZ007', 'Apple Watch SE 2da Gen 44mm', 'Smartwatch accesible con chip S8, detección de choques, seguimiento de actividad y sueño', 249.00, 'Smartwatch', 'https://images.unsplash.com/photo-1434493789847-2a75b335f79d?w=500&h=500&fit=crop', 18, 'Sí', 7, 180.00],
+        ['TZ008', 'Garmin Venu 3', 'Smartwatch deportivo premium con GPS, monitor de sueño avanzado, 14 días de batería, coach de salud', 449.00, 'Smartwatch', 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=500&h=500&fit=crop', 8, 'No', 7, 340.00],
+        ['TZ009', 'AirPods Pro 2da Generación', 'Auriculares con cancelación activa de ruido, audio espacial personalizado, estuche MagSafe con parlante', 249.00, 'Audífonos', 'https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?w=500&h=500&fit=crop', 25, 'Sí', 7, 180.00],
+        ['TZ010', 'Samsung Galaxy Buds2 Pro', 'Auriculares TWS con ANC inteligente, audio Hi-Fi 24bit, resistentes al agua IPX7, 29h de batería total', 189.00, 'Audífonos', 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=500&h=500&fit=crop', 22, 'No', 7, 130.00],
+        ['TZ011', 'Sony WH-1000XM5', 'Auriculares over-ear con la mejor cancelación de ruido, audio Hi-Res, 30 horas de batería', 349.00, 'Audífonos', 'https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?w=500&h=500&fit=crop', 10, 'Sí', 7, 250.00],
+        ['TZ012', 'JBL Tune 760NC', 'Auriculares inalámbricos con cancelación activa de ruido, hasta 50 horas de batería, plegables', 99.00, 'Audífonos', 'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=500&h=500&fit=crop', 30, 'No', 7, 60.00],
+        ['TZ013', 'iPad Pro 12.9 pulgadas M2 256GB', 'Tablet Apple con chip M2, pantalla Liquid Retina XDR, compatible con Apple Pencil 2 y Magic Keyboard', 1099.00, 'Tablets', 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=500&h=500&fit=crop', 6, 'Sí', 7, 800.00],
+        ['TZ014', 'iPad Air 10.9 pulgadas M1 64GB', 'Tablet Apple con chip M1, pantalla Liquid Retina, Touch ID, compatible con Apple Pencil', 599.00, 'Tablets', 'https://images.unsplash.com/photo-1561154464-82e9adf32764?w=500&h=500&fit=crop', 12, 'No', 7, 440.00],
+        ['TZ015', 'Samsung Galaxy Tab S9 Ultra', 'Tablet Samsung con pantalla Super AMOLED 14.6 pulgadas, S Pen incluido, resistente al agua', 1049.00, 'Tablets', 'https://images.unsplash.com/photo-1632634472642-0e9e6e5c5e10?w=500&h=500&fit=crop', 5, 'Sí', 7, 780.00],
+        ['TZ016', 'Cargador Inalámbrico MagSafe 3 en 1', 'Estación de carga para iPhone, Apple Watch y AirPods, carga rápida 15W, diseño elegante', 79.99, 'Accesorios', 'https://images.unsplash.com/photo-1618577608401-46f4a95c5fa5?w=500&h=500&fit=crop', 35, 'No', 7, 45.00],
+        ['TZ017', 'Power Bank Anker 20000mAh', 'Batería portátil con carga rápida PD 65W, 2 puertos USB-C, pantalla LED, carga 3 dispositivos', 59.99, 'Accesorios', 'https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=500&h=500&fit=crop', 40, 'Sí', 7, 35.00],
+        ['TZ018', 'Cable USB-C a Lightning 2m', 'Cable de carga rápida certificado MFi, trenzado de nylon resistente, soporta 20W', 24.99, 'Accesorios', 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=500&h=500&fit=crop', 50, 'No', 7, 12.00],
+        ['TZ019', 'Funda iPhone 15 Pro Max MagSafe', 'Funda de silicona premium con MagSafe integrado, protección contra caídas, varios colores', 49.99, 'Accesorios', 'https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?w=500&h=500&fit=crop', 45, 'No', 7, 25.00],
+        ['TZ020', 'Soporte Laptop Ajustable Aluminio', 'Soporte ergonómico de aluminio para laptop hasta 17 pulgadas, plegable, mejora ventilación', 39.99, 'Accesorios', 'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=500&h=500&fit=crop', 28, 'No', 7, 22.00]
+      ];
+      hojaProductos.getRange(2, 1, datosEjemplo.length, 10).setValues(datosEjemplo);
+      
+      // Formato de moneda para columnas de precio y costo
+      hojaProductos.getRange('D2:D100').setNumberFormat('$#,##0.00');
+      hojaProductos.getRange('J2:J100').setNumberFormat('$#,##0.00');
+    }
+    
+    // Crear hoja de Pedidos
+    let hojaPedidos = ss.getSheetByName('Pedidos');
+    if (!hojaPedidos) {
+      hojaPedidos = ss.insertSheet('Pedidos');
+    }
+    
+    const primeraFilaPedidos = hojaPedidos.getRange('A1').getValue();
+    if (!primeraFilaPedidos || primeraFilaPedidos !== 'Fecha') {
+      hojaPedidos.clear();
+      hojaPedidos.getRange('A1:J1').setValues([[
+        'Fecha', 'ID Pedido', 'Cliente', 'Email', 'Teléfono', 'Dirección', 'Subtotal', 'ITBMS', 'Total', 'Estado'
+      ]]);
+      hojaPedidos.getRange('A1:J1').setFontWeight('bold').setBackground('#0a1628');
+      hojaPedidos.getRange('A1:J1').setFontColor('#00d4ff');
+      hojaPedidos.setFrozenRows(1);
+      
+      // Ajustar ancho de columnas
+      hojaPedidos.setColumnWidth(1, 150);  // Fecha
+      hojaPedidos.setColumnWidth(2, 180);  // ID Pedido
+      hojaPedidos.setColumnWidth(3, 200);  // Cliente
+      hojaPedidos.setColumnWidth(4, 220);  // Email
+      hojaPedidos.setColumnWidth(5, 130);  // Teléfono
+      hojaPedidos.setColumnWidth(6, 300);  // Dirección
+      hojaPedidos.setColumnWidth(7, 100);  // Subtotal
+      hojaPedidos.setColumnWidth(8, 100);  // ITBMS
+      hojaPedidos.setColumnWidth(9, 100);  // Total
+      hojaPedidos.setColumnWidth(10, 100); // Estado
+      
+      // Formato de moneda
+      hojaPedidos.getRange('G2:I100').setNumberFormat('$#,##0.00');
+    }
+    
+    // Crear hoja de Detalle de Pedidos
+    let hojaDetalle = ss.getSheetByName('DetallePedidos');
+    if (!hojaDetalle) {
+      hojaDetalle = ss.insertSheet('DetallePedidos');
+    }
+    
+    const primeraFilaDetalle = hojaDetalle.getRange('A1').getValue();
+    if (!primeraFilaDetalle || primeraFilaDetalle !== 'ID Pedido') {
+      hojaDetalle.clear();
+      hojaDetalle.getRange('A1:I1').setValues([[
+        'ID Pedido', 'ID Producto', 'Nombre Producto', 'Cantidad', 'Precio Base', 'ITBMS %', 'ITBMS Monto', 'Precio Final', 'Subtotal'
+      ]]);
+      hojaDetalle.getRange('A1:I1').setFontWeight('bold').setBackground('#0a1628');
+      hojaDetalle.getRange('A1:I1').setFontColor('#00d4ff');
+      hojaDetalle.setFrozenRows(1);
+      
+      // Ajustar ancho de columnas
+      hojaDetalle.setColumnWidth(1, 180);  // ID Pedido
+      hojaDetalle.setColumnWidth(2, 100);  // ID Producto
+      hojaDetalle.setColumnWidth(3, 280);  // Nombre Producto
+      hojaDetalle.setColumnWidth(4, 80);   // Cantidad
+      hojaDetalle.setColumnWidth(5, 100);  // Precio Base
+      hojaDetalle.setColumnWidth(6, 80);   // ITBMS %
+      hojaDetalle.setColumnWidth(7, 100);  // ITBMS Monto
+      hojaDetalle.setColumnWidth(8, 100);  // Precio Final
+      hojaDetalle.setColumnWidth(9, 100);  // Subtotal
+      
+      // Formato de moneda
+      hojaDetalle.getRange('E2:E100').setNumberFormat('$#,##0.00');
+      hojaDetalle.getRange('G2:I100').setNumberFormat('$#,##0.00');
+    }
+    
+    Logger.log('Hojas inicializadas correctamente');
+    return 'Hojas inicializadas correctamente con ' + 20 + ' productos de ejemplo';
+  } catch (error) {
+    Logger.log('Error en inicializarHojas: ' + error.toString());
+    return 'Error: ' + error.toString();
+  }
+}
+
+// ============================================
+// OBTENER PRODUCTOS (con auto-inicialización)
+// ============================================
+function obtenerProductos() {
+  try {
+    Logger.log('Iniciando obtenerProductos...');
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    let hoja = ss.getSheetByName('Productos');
+    
+    // Si no existe la hoja o está vacía, inicializar
+    if (!hoja) {
+      Logger.log('Hoja Productos no encontrada, inicializando...');
+      inicializarHojas();
+      hoja = ss.getSheetByName('Productos');
+    }
+    
+    // Verificar si tiene cabeceras
+    const primeraFila = hoja.getRange('A1').getValue();
+    if (!primeraFila || primeraFila !== 'ID') {
+      Logger.log('Cabeceras no encontradas, inicializando...');
+      inicializarHojas();
+    }
+    
+    const datos = hoja.getDataRange().getValues();
+    const productos = [];
+    
+    for (let i = 1; i < datos.length; i++) {
+      if (datos[i][0]) {
+        const precioBase = Number(datos[i][3]);
+        const itbmsPorc = Number(datos[i][8]) || 0;
+        const itbmsMonto = precioBase * (itbmsPorc / 100);
+        const precioFinal = precioBase + itbmsMonto;
+        
+        productos.push({
+          id: String(datos[i][0]),
+          nombre: String(datos[i][1]),
+          descripcion: String(datos[i][2]),
+          precioBase: precioBase,
+          categoria: String(datos[i][4]),
+          imagen: String(datos[i][5]),
+          stock: Number(datos[i][6]),
+          destacado: datos[i][7] === 'Sí',
+          itbmsPorc: itbmsPorc,
+          itbmsMonto: itbmsMonto,
+          precioFinal: precioFinal
+        });
+      }
+    }
+    
+    Logger.log('Productos procesados: ' + productos.length);
+    return productos;
+  } catch (error) {
+    Logger.log('Error en obtenerProductos: ' + error.toString());
+    return [];
+  }
+}
+
+// ============================================
+// ACTUALIZAR STOCK DE PRODUCTOS
+// ============================================
+function actualizarStock(carrito) {
+  try {
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const hojaProductos = ss.getSheetByName('Productos');
+    const datos = hojaProductos.getDataRange().getValues();
+    
+    carrito.forEach(itemCarrito => {
+      for (let i = 1; i < datos.length; i++) {
+        if (String(datos[i][0]) === itemCarrito.id) {
+          const stockActual = Number(datos[i][6]);
+          const nuevoStock = stockActual - itemCarrito.cantidad;
+          hojaProductos.getRange(i + 1, 7).setValue(nuevoStock);
+          Logger.log(`Stock actualizado para ${itemCarrito.nombre}: ${stockActual} -> ${nuevoStock}`);
+          break;
+        }
+      }
+    });
+    
+    return true;
+  } catch (error) {
+    Logger.log('Error al actualizar stock: ' + error.toString());
+    return false;
+  }
+}
+
+// ============================================
+// PROCESAR PEDIDO
+// ============================================
+function procesarPedido(datosCliente, carrito) {
+  try {
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const hojaPedidos = ss.getSheetByName('Pedidos');
+    const hojaDetalle = ss.getSheetByName('DetallePedidos');
+    
+    const idPedido = 'TZ-' + new Date().getTime();
+    const fecha = new Date();
+    
+    let subtotal = 0;
+    let totalITBMS = 0;
+    
+    carrito.forEach(item => {
+      const subtotalItem = item.precioBase * item.cantidad;
+      const itbmsItem = item.itbmsMonto * item.cantidad;
+      subtotal += subtotalItem;
+      totalITBMS += itbmsItem;
+    });
+    
+    const total = subtotal + totalITBMS;
+    
+    hojaPedidos.appendRow([
+      fecha,
+      idPedido,
+      datosCliente.nombre,
+      datosCliente.email,
+      datosCliente.telefono,
+      datosCliente.direccion,
+      subtotal,
+      totalITBMS,
+      total,
+      'Pendiente'
+    ]);
+    
+    carrito.forEach(item => {
+      const subtotalItem = item.precioBase * item.cantidad;
+      const itbmsMontoItem = item.itbmsMonto * item.cantidad;
+      const totalItem = item.precioFinal * item.cantidad;
+      
+      hojaDetalle.appendRow([
+        idPedido,
+        item.id,
+        item.nombre,
+        item.cantidad,
+        item.precioBase,
+        item.itbmsPorc,
+        itbmsMontoItem,
+        item.precioFinal,
+        totalItem
+      ]);
+    });
+    
+    actualizarStock(carrito);
+    enviarCorreoPedido(datosCliente, carrito, idPedido, subtotal, totalITBMS, total);
+    
+    return { success: true, idPedido: idPedido };
+  } catch (error) {
+    Logger.log('Error en procesarPedido: ' + error.toString());
+    return { success: false, error: error.toString() };
+  }
+}
+
+// ============================================
+// ENVIAR CORREO CON PDF (Cliente y Dueño)
+// ============================================
+function enviarCorreoPedido(cliente, carrito, idPedido, subtotal, totalITBMS, total) {
+  try {
+    const pdfBlob = generarPDFPedido(cliente, carrito, idPedido, subtotal, totalITBMS, total);
+    
+    // ===== CORREO PARA EL CLIENTE =====
+    const htmlBodyCliente = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8f9fa;">
+        <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2d4a 100%); padding: 40px; text-align: center;">
+          <img src="${LOGO_URL}" alt="Logo" style="max-width: 180px; margin-bottom: 20px;">
+          <h1 style="color: #00d4ff; margin: 0; font-weight: 400; letter-spacing: 2px;">¡GRACIAS POR TU COMPRA!</h1>
+        </div>
+        
+        <div style="padding: 40px; background: #ffffff;">
+          <h2 style="color: #0a1628; font-weight: 500; border-bottom: 3px solid #00d4ff; padding-bottom: 15px;">Pedido #${idPedido}</h2>
+          <p style="color: #555; font-size: 16px;">Hola <strong>${cliente.nombre}</strong>,</p>
+          <p style="color: #555; font-size: 16px;">Hemos recibido tu pedido. Adjuntamos los detalles en formato PDF.</p>
+          
+          <div style="background: #f8f9fa; padding: 25px; margin: 25px 0; border-left: 4px solid #00d4ff; border-radius: 0 8px 8px 0;">
+            <h3 style="color: #0a1628; margin-top: 0; font-weight: 500;">📦 Resumen del Pedido</h3>
+            ${carrito.map(item => `
+              <div style="border-bottom: 1px solid #eee; padding: 15px 0;">
+                <strong style="color: #0a1628;">${item.nombre}</strong><br>
+                <span style="color: #666;">${item.cantidad} × $${item.precioBase.toFixed(2)} = $${(item.cantidad * item.precioBase).toFixed(2)}</span>
+                ${item.itbmsPorc > 0 ? `<br><small style="color: #888;">ITBMS (${item.itbmsPorc}%): $${(item.itbmsMonto * item.cantidad).toFixed(2)}</small>` : '<br><small style="color: #888;">Exento de ITBMS</small>'}
+              </div>
+            `).join('')}
+            <div style="padding: 15px 0; border-bottom: 1px solid #eee;">
+              <div style="display: flex; justify-content: space-between; color: #555;">
+                <span>Subtotal:</span>
+                <span>$${subtotal.toFixed(2)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; color: #888; margin-top: 8px;">
+                <span>ITBMS:</span>
+                <span>$${totalITBMS.toFixed(2)}</span>
+              </div>
+            </div>
+            <div style="padding: 20px 0; font-size: 24px; font-weight: bold; color: #00d4ff;">
+              Total: $${total.toFixed(2)}
+            </div>
+          </div>
+          
+          <p style="color: #555;"><strong>Información de contacto:</strong></p>
+          <p style="color: #666;">
+            📍 ${EMPRESA.direccion}<br>
+            📞 ${EMPRESA.telefono}
+          </p>
+          
+          <p style="color: #555;">Nos pondremos en contacto contigo para coordinar la entrega.</p>
+          <p style="color: #999; font-size: 12px; margin-top: 30px; text-align: center;">
+            ${EMPRESA.nombre} - ${EMPRESA.slogan}
+          </p>
+        </div>
+      </div>
+    `;
+    
+    MailApp.sendEmail({
+      to: cliente.email,
+      subject: `✅ Confirmación de Pedido #${idPedido} - ${EMPRESA.nombre}`,
+      htmlBody: htmlBodyCliente,
+      attachments: [pdfBlob]
+    });
+    
+    // ===== CORREO PARA EL DUEÑO =====
+    const htmlBodyDueno = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2d4a 100%); padding: 40px; text-align: center;">
+          <img src="${LOGO_URL}" alt="Logo" style="max-width: 180px; margin-bottom: 20px;">
+          <h1 style="color: #00d4ff; margin: 0; font-weight: 400; letter-spacing: 2px;">🔔 NUEVA VENTA</h1>
+        </div>
+        
+        <div style="padding: 40px; background: #ffffff;">
+          <h2 style="color: #0a1628; font-weight: 500;">Pedido #${idPedido}</h2>
+          
+          <div style="background: #f8f9fa; padding: 25px; margin: 25px 0; border-left: 4px solid #00d4ff; border-radius: 0 8px 8px 0;">
+            <h3 style="color: #0a1628; margin-top: 0; font-weight: 500;">👤 Datos del Cliente</h3>
+            <p style="margin: 8px 0; color: #555;"><strong>Nombre:</strong> ${cliente.nombre}</p>
+            <p style="margin: 8px 0; color: #555;"><strong>Email:</strong> ${cliente.email}</p>
+            <p style="margin: 8px 0; color: #555;"><strong>Teléfono:</strong> ${cliente.telefono}</p>
+            <p style="margin: 8px 0; color: #555;"><strong>Dirección:</strong> ${cliente.direccion}</p>
+          </div>
+          
+          <div style="background: #f8f9fa; padding: 25px; margin: 25px 0; border-left: 4px solid #00d4ff; border-radius: 0 8px 8px 0;">
+            <h3 style="color: #0a1628; margin-top: 0; font-weight: 500;">📦 Productos Vendidos</h3>
+            ${carrito.map(item => `
+              <div style="border-bottom: 1px solid #eee; padding: 15px 0;">
+                <strong style="color: #0a1628;">${item.nombre}</strong><br>
+                <span style="color: #666;">Cantidad: ${item.cantidad} × $${item.precioBase.toFixed(2)} = $${(item.cantidad * item.precioBase).toFixed(2)}</span>
+                ${item.itbmsPorc > 0 ? `<br><small style="color: #888;">ITBMS (${item.itbmsPorc}%): $${(item.itbmsMonto * item.cantidad).toFixed(2)}</small>` : ''}
+              </div>
+            `).join('')}
+            <div style="padding: 20px 0; font-size: 26px; font-weight: bold; color: #00d4ff;">
+              Total: $${total.toFixed(2)}
+            </div>
+          </div>
+          
+          <p style="background: #fff3cd; border: 2px solid #ffc107; padding: 20px; border-radius: 8px; color: #856404;">
+            ⚠️ <strong>Acción requerida:</strong> Contacta al cliente para coordinar el pago y la entrega.
+          </p>
+        </div>
+      </div>
+    `;
+    
+    MailApp.sendEmail({
+      to: EMPRESA.emailDueno,
+      subject: `🔔 Nueva Venta - Pedido #${idPedido} - ${cliente.nombre}`,
+      htmlBody: htmlBodyDueno,
+      attachments: [pdfBlob]
+    });
+    
+    Logger.log('Correos enviados correctamente');
+    return true;
+  } catch (error) {
+    Logger.log('Error al enviar correo: ' + error);
+    return false;
+  }
+}
+
+// ============================================
+// GENERAR PDF DEL PEDIDO
+// ============================================
+function generarPDFPedido(cliente, carrito, idPedido, subtotal, totalITBMS, total) {
+  let productosHTML = '';
+  carrito.forEach(item => {
+    const subtotalItem = item.precioBase * item.cantidad;
+    const itbmsMontoItem = item.itbmsMonto * item.cantidad;
+    const totalItem = item.precioFinal * item.cantidad;
+    
+    productosHTML += `
+      <tr>
+        <td style="padding: 15px; border-bottom: 1px solid #eee; color: #333;">${item.nombre}</td>
+        <td style="padding: 15px; border-bottom: 1px solid #eee; text-align: center; color: #333;">${item.cantidad}</td>
+        <td style="padding: 15px; border-bottom: 1px solid #eee; text-align: right; color: #333;">$${item.precioBase.toFixed(2)}</td>
+        <td style="padding: 15px; border-bottom: 1px solid #eee; text-align: center; color: #333;">${item.itbmsPorc > 0 ? item.itbmsPorc + '%' : 'Exento'}</td>
+        <td style="padding: 15px; border-bottom: 1px solid #eee; text-align: right; color: #333;">$${itbmsMontoItem.toFixed(2)}</td>
+        <td style="padding: 15px; border-bottom: 1px solid #eee; text-align: right; color: #333;">$${totalItem.toFixed(2)}</td>
+      </tr>
+    `;
+  });
+  
+  const html = `
+    <html>
+    <head>
+      <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; background: #fff; color: #333; }
+        .header { background: linear-gradient(135deg, #0a1628, #1a2d4a); color: #00d4ff; padding: 40px; text-align: center; margin-bottom: 40px; border-radius: 8px; }
+        .header h1 { font-weight: 400; letter-spacing: 3px; margin: 0; font-size: 28px; }
+        .header p { color: #7eb8c9; margin-top: 10px; font-size: 14px; letter-spacing: 2px; }
+        h2 { color: #0a1628; font-weight: 500; border-bottom: 3px solid #00d4ff; padding-bottom: 15px; }
+        h3 { color: #0a1628; font-weight: 500; }
+        table { width: 100%; border-collapse: collapse; margin: 25px 0; }
+        th { background: #0a1628; color: #00d4ff; padding: 15px; text-align: left; font-weight: 500; }
+        .subtotales { background: #f8f9fa; }
+        .total { background: linear-gradient(135deg, #0a1628, #1a2d4a); color: #00d4ff; font-size: 18px; }
+        .info { margin: 20px 0; line-height: 2; color: #555; }
+        .footer { margin-top: 50px; text-align: center; color: #999; padding: 30px; border-top: 3px solid #00d4ff; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>TECHZONE</h1>
+        <p>TECNOLOGÍA & ACCESORIOS</p>
+        <p style="margin-top: 15px; font-size: 12px;">${EMPRESA.direccion} | ${EMPRESA.telefono}</p>
+      </div>
+      
+      <h2>📦 FACTURA DE PEDIDO #${idPedido}</h2>
+      <p style="color: #666;"><strong>Fecha:</strong> ${new Date().toLocaleDateString('es-PA', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      
+      <h3>👤 Datos del Cliente</h3>
+      <div class="info">
+        <strong>Nombre:</strong> ${cliente.nombre}<br>
+        <strong>Email:</strong> ${cliente.email}<br>
+        <strong>Teléfono:</strong> ${cliente.telefono}<br>
+        <strong>Dirección:</strong> ${cliente.direccion}
+      </div>
+      
+      <h3>🛒 Detalle del Pedido</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th style="text-align: center;">Cant.</th>
+            <th style="text-align: right;">Precio</th>
+            <th style="text-align: center;">ITBMS</th>
+            <th style="text-align: right;">Impuesto</th>
+            <th style="text-align: right;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${productosHTML}
+          <tr class="subtotales">
+            <td colspan="5" style="text-align: right; padding: 15px; font-weight: bold;">SUBTOTAL:</td>
+            <td style="text-align: right; padding: 15px;">$${subtotal.toFixed(2)}</td>
+          </tr>
+          <tr class="subtotales">
+            <td colspan="5" style="text-align: right; padding: 15px; font-weight: bold;">ITBMS:</td>
+            <td style="text-align: right; padding: 15px;">$${totalITBMS.toFixed(2)}</td>
+          </tr>
+          <tr class="total">
+            <td colspan="5" style="text-align: right; padding: 18px; font-weight: bold; letter-spacing: 1px;">TOTAL A PAGAR:</td>
+            <td style="text-align: right; padding: 18px; font-weight: bold;">$${total.toFixed(2)}</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div class="footer">
+        <p style="font-size: 16px; color: #00d4ff; margin-bottom: 10px;">¡Gracias por tu compra!</p>
+        <p>${EMPRESA.nombre} - ${EMPRESA.slogan}</p>
+      </div>
+    </body>
+    </html>
+  `;
+  
+  const blob = Utilities.newBlob(html, 'text/html', 'pedido.html');
+  return blob.getAs('application/pdf').setName(`Pedido_${idPedido}.pdf`);
+}
