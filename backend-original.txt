@@ -1,7 +1,7 @@
 // ============================================
 // CONFIGURACIÓN INICIAL
 // ============================================
-const SHEET_ID = '1eo2E8Ln0sGr_vjwp8-2YNLAlVIuH06F4HXeq_LecrAs';
+const SHEET_ID = '1JbcsekjdeU1o91ByS9OaT0xdiBsH1A-c-C6tNmO4Rk8';
 const LOGO_URL = 'https://i.postimg.cc/8zRp0Prq/Logo-Tienda-de-articulos-Tecnologicos.png';
 
 const EMPRESA = {
