@@ -1,5 +1,18 @@
 {
+  "name": "techzone-tienda",
+  "version": "1.0.0",
+  "description": "Tienda e-commerce TechZone con Google Sheets",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test-sheets.js"
+  },
+  "keywords": [],
+  "author": "Dev-Aizprua",
+  "license": "ISC",
   "dependencies": {
-    "googleapis": "^171.0.0"
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "googleapis": "^144.0.0",
+    "micro": "^10.0.1"
   }
 }
