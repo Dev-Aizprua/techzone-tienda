@@ -614,20 +614,37 @@
       });
     };
 
-    function cargarProductos() {
-      google.script.run
-        .withSuccessHandler(function(data) {
-          if (!data || data.length === 0) { mostrarError('No se encontraron productos.'); return; }
-          productos = data;
-          extraerCategorias();
-          mostrarProductos();
-          generarOpcionesFiltro();
-          ocultarCarga();
-        })
-        .withFailureHandler(function(error) { mostrarError('Error al cargar productos: ' + error.message); })
-        .obtenerProductos();
+    async function cargarProductos() {
+  try {
+    console.log('🔄 Cargando productos desde API...');
+    
+    const response = await fetch('/api/productos');
+    const resultado = await response.json();
+    
+    if (!resultado.success) {
+      mostrarError('Error al cargar productos: ' + (resultado.error || 'Error desconocido'));
+      return;
     }
-
+    
+    const data = resultado.productos;
+    
+    if (!data || data.length === 0) {
+      mostrarError('No se encontraron productos.');
+      return;
+    }
+    
+    console.log('✅ ' + data.length + ' productos cargados');
+    productos = data;
+    extraerCategorias();
+    mostrarProductos();
+    generarOpcionesFiltro();
+    ocultarCarga();
+    
+  } catch (error) {
+    console.error('❌ Error:', error);
+    mostrarError('Error de conexión: ' + error.message);
+  }
+}
     function extraerCategorias() {
       const categoriasSet = new Set();
       productos.forEach(p => categoriasSet.add(p.categoria));
@@ -777,21 +794,20 @@
   if (ultimoPedido) {
     document.getElementById('productosGrid').innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 60px;"><div class="spinner" style="margin: 0 auto 20px;"></div><p style="color: var(--primary);">Actualizando inventario...</p></div>';
     
-    google.script.run
-      .withSuccessHandler(function(data) {
-        if (data && data.length > 0) {
-          productos = data;
-          mostrarProductos();
-          aplicarFiltro();
-        }
-        ultimoPedido = null; // Limpiar después de actualizar
-      })
-      .withFailureHandler(function(error) {
-        console.error('Error al recargar productos:', error);
-        location.reload();
-      })
-      .obtenerProductos();
-  }
+   fetch('/api/productos')
+  .then(res => res.json())
+  .then(resultado => {
+    if (resultado.success && resultado.productos && resultado.productos.length > 0) {
+      productos = resultado.productos;
+      mostrarProductos();
+      aplicarFiltro();
+    }
+    ultimoPedido = null;
+  })
+  .catch(error => {
+    console.error('Error al recargar productos:', error);
+    location.reload();
+  });  }
 }
     function cerrarModalSiEsFondo(event) { if (event.target.id === 'modalCarrito') cerrarCarrito(); }
 
