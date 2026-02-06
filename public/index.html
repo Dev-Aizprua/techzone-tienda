@@ -277,7 +277,7 @@
     .producto-info { padding: 18px; }
     .producto-categoria { 
       color: var(--primary); 
-      font-size: 13px; /* AUMENTADO de 11px a 13px */
+      font-size: 13px;
       font-weight: 600; 
       text-transform: uppercase; 
       margin-bottom: 8px; 
@@ -285,12 +285,12 @@
     }
     .producto-nombre { 
       font-family: 'Inter', sans-serif;
-      font-size: 18px; /* AUMENTADO de 16px a 18px */
+      font-size: 18px;
       font-weight: 600; 
       color: var(--secondary); 
       margin-bottom: 8px; 
       line-height: 1.4; 
-      min-height: 48px; /* AUMENTADO de 44px a 48px */
+      min-height: 48px;
       display: -webkit-box; 
       -webkit-line-clamp: 2; 
       -webkit-box-orient: vertical; 
@@ -298,7 +298,7 @@
     }
     .producto-descripcion { 
       color: var(--gray-500); 
-      font-size: 14px; /* AUMENTADO de 12px a 14px */
+      font-size: 14px;
       font-weight: 400; 
       margin-bottom: 15px; 
       display: -webkit-box; 
@@ -311,12 +311,12 @@
     .producto-precio-container { flex: 1; }
     .producto-precio { 
       font-family: 'Orbitron', sans-serif;
-      font-size: 28px; /* AUMENTADO de 24px a 28px */
+      font-size: 20px;
       font-weight: 600; 
       color: var(--secondary);
     }
-    .producto-precio-detalle { font-size: 12px; /* AUMENTADO de 10px a 12px */ color: var(--gray-500); margin-top: 3px; }
-    .producto-stock { font-size: 12px; /* AUMENTADO de 10px a 12px */ color: var(--gray-500); margin-top: 4px; }
+    .producto-precio-detalle { font-size: 12px; color: var(--gray-500); margin-top: 3px; }
+    .producto-stock { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
     .producto-stock.bajo { color: #ff6b6b; font-weight: 600; }
     .producto-stock.agotado { color: #dc3545; font-weight: 700; }
     
@@ -432,6 +432,10 @@
     .btn-checkout:hover { 
       box-shadow: 0 10px 30px rgba(0, 212, 255, 0.4);
       transform: translateY(-2px);
+    }
+    .btn-checkout:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
     
     /* ========== FORMULARIO CHECKOUT ========== */
@@ -615,36 +619,37 @@
     };
 
     async function cargarProductos() {
-  try {
-    console.log('🔄 Cargando productos desde API...');
-    
-    const response = await fetch('/api/productos');
-    const resultado = await response.json();
-    
-    if (!resultado.success) {
-      mostrarError('Error al cargar productos: ' + (resultado.error || 'Error desconocido'));
-      return;
+      try {
+        console.log('🔄 Cargando productos desde API...');
+        
+        const response = await fetch('/api/productos');
+        const resultado = await response.json();
+        
+        if (!resultado.success) {
+          mostrarError('Error al cargar productos: ' + (resultado.error || 'Error desconocido'));
+          return;
+        }
+        
+        const data = resultado.productos;
+        
+        if (!data || data.length === 0) {
+          mostrarError('No se encontraron productos.');
+          return;
+        }
+        
+        console.log('✅ ' + data.length + ' productos cargados');
+        productos = data;
+        extraerCategorias();
+        mostrarProductos();
+        generarOpcionesFiltro();
+        ocultarCarga();
+        
+      } catch (error) {
+        console.error('❌ Error:', error);
+        mostrarError('Error de conexión: ' + error.message);
+      }
     }
-    
-    const data = resultado.productos;
-    
-    if (!data || data.length === 0) {
-      mostrarError('No se encontraron productos.');
-      return;
-    }
-    
-    console.log('✅ ' + data.length + ' productos cargados');
-    productos = data;
-    extraerCategorias();
-    mostrarProductos();
-    generarOpcionesFiltro();
-    ocultarCarga();
-    
-  } catch (error) {
-    console.error('❌ Error:', error);
-    mostrarError('Error de conexión: ' + error.message);
-  }
-}
+
     function extraerCategorias() {
       const categoriasSet = new Set();
       productos.forEach(p => categoriasSet.add(p.categoria));
@@ -752,18 +757,14 @@
       const producto = productos.find(p => p.id === idProducto);
       if (!producto) return;
       
-      // Validar que hay stock disponible
       if (producto.stock <= 0) {
         alert('Este producto está agotado');
         return;
       }
       
       const itemExistente = carrito.find(item => item.id === idProducto);
-      
-      // Calcular cantidad actual en carrito
       const cantidadEnCarrito = itemExistente ? itemExistente.cantidad : 0;
       
-      // Validar que no exceda el stock disponible
       if (cantidadEnCarrito >= producto.stock) {
         alert('No hay más stock disponible. Stock actual: ' + producto.stock);
         return;
@@ -786,29 +787,31 @@
     }
 
     function abrirCarrito() { mostrarCarrito(); document.getElementById('modalCarrito').classList.add('active'); document.body.style.overflow = 'hidden'; }
-    function cerrarCarrito() { 
-  document.getElementById('modalCarrito').classList.remove('active'); 
-  document.body.style.overflow = ''; 
-  
-  // Si hubo un pedido exitoso, recargar productos
-  if (ultimoPedido) {
-    document.getElementById('productosGrid').innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 60px;"><div class="spinner" style="margin: 0 auto 20px;"></div><p style="color: var(--primary);">Actualizando inventario...</p></div>';
     
-   fetch('/api/productos')
-  .then(res => res.json())
-  .then(resultado => {
-    if (resultado.success && resultado.productos && resultado.productos.length > 0) {
-      productos = resultado.productos;
-      mostrarProductos();
-      aplicarFiltro();
+    function cerrarCarrito() { 
+      document.getElementById('modalCarrito').classList.remove('active'); 
+      document.body.style.overflow = ''; 
+      
+      if (ultimoPedido) {
+        document.getElementById('productosGrid').innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 60px;"><div class="spinner" style="margin: 0 auto 20px;"></div><p style="color: var(--primary);">Actualizando inventario...</p></div>';
+        
+        fetch('/api/productos')
+          .then(res => res.json())
+          .then(resultado => {
+            if (resultado.success && resultado.productos && resultado.productos.length > 0) {
+              productos = resultado.productos;
+              mostrarProductos();
+              aplicarFiltro();
+            }
+            ultimoPedido = null;
+          })
+          .catch(error => {
+            console.error('Error al recargar productos:', error);
+            location.reload();
+          });
+      }
     }
-    ultimoPedido = null;
-  })
-  .catch(error => {
-    console.error('Error al recargar productos:', error);
-    location.reload();
-  });  }
-}
+    
     function cerrarModalSiEsFondo(event) { if (event.target.id === 'modalCarrito') cerrarCarrito(); }
 
     function mostrarCarrito() {
@@ -827,13 +830,11 @@
       const producto = productos.find(p => p.id === item.id);
       const nuevaCantidad = item.cantidad + cambio;
       
-      // No permitir cantidad menor a 1 (usar eliminar para quitar)
       if (nuevaCantidad < 1) {
         eliminarDelCarrito(index);
         return;
       }
       
-      // No permitir exceder el stock disponible
       if (nuevaCantidad > producto.stock) {
         alert('No hay suficiente stock. Disponible: ' + producto.stock);
         return;
@@ -854,83 +855,83 @@
       body.innerHTML = '<h3 class="checkout-title">📦 INFORMACIÓN DE ENVÍO</h3><div class="checkout-resumen"><h4>Resumen del Pedido</h4>' + carrito.map(item => '<div class="resumen-item"><div class="resumen-item-header"><span>' + item.nombre + ' (x' + item.cantidad + ')</span><span>$' + (item.precioFinal * item.cantidad).toFixed(2) + '</span></div><div class="resumen-item-detail">Base: $' + (item.precioBase * item.cantidad).toFixed(2) + (item.itbmsPorc > 0 ? ' | ITBMS: $' + (item.itbmsMonto * item.cantidad).toFixed(2) : ' | Exento') + '</div></div>').join('') + '<div class="resumen-totales"><div class="resumen-row"><span>Subtotal:</span><span>$' + subtotal.toFixed(2) + '</span></div><div class="resumen-row" style="color:#6c757d;"><span>ITBMS:</span><span>$' + totalITBMS.toFixed(2) + '</span></div><div class="resumen-row total"><span>Total:</span><span>$' + total.toFixed(2) + '</span></div></div></div><form id="checkoutForm" onsubmit="finalizarCompra(event)"><div class="form-group"><label>Nombre Completo *</label><input type="text" name="nombre" required placeholder="Tu nombre completo"></div><div class="form-group"><label>Email *</label><input type="email" name="email" required placeholder="correo@ejemplo.com"></div><div class="form-group"><label>Teléfono *</label><input type="tel" name="telefono" required placeholder="+507 6000-0000"></div><div class="form-group"><label>Dirección de Envío *</label><textarea name="direccion" required placeholder="Dirección completa para la entrega..."></textarea></div><div class="buttons-row"><button type="button" class="btn-volver" onclick="mostrarCarrito()">← Volver</button><button type="submit" class="btn-checkout" style="flex:1;">Finalizar Compra</button></div></form>';
     }
 
-    function finalizarCompra(event) {
+    // PROCESAR PEDIDO CON API
+    async function finalizarCompra(event) {
       event.preventDefault();
       const form = event.target;
-      const datosCliente = { nombre: form.nombre.value, email: form.email.value, telefono: form.telefono.value, direccion: form.direccion.value };
-      ultimoPedido = { cliente: datosCliente, productos: [...carrito], fecha: new Date().toLocaleDateString('es-PA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), hora: new Date().toLocaleTimeString('es-PA', { hour: '2-digit', minute: '2-digit' }) };
+      const datosCliente = { 
+        nombre: form.nombre.value, 
+        email: form.email.value, 
+        telefono: form.telefono.value, 
+        direccion: form.direccion.value 
+      };
+      
       const btnSubmit = form.querySelector('button[type="submit"]');
       btnSubmit.disabled = true; 
-      btnSubmit.textContent = 'Verificando stock...';
+      btnSubmit.textContent = 'Procesando pedido...';
       
-      // Primero verificar stock actualizado
-      google.script.run
-        .withSuccessHandler(function(productosActualizados) {
-          // Verificar que todos los productos del carrito tienen stock suficiente
-          let stockValido = true;
-          let mensajeError = '';
-          
-          carrito.forEach(itemCarrito => {
-            const productoActual = productosActualizados.find(p => p.id === itemCarrito.id);
-            if (!productoActual) {
-              stockValido = false;
-              mensajeError += '- ' + itemCarrito.nombre + ' ya no está disponible\n';
-            } else if (productoActual.stock < itemCarrito.cantidad) {
-              stockValido = false;
-              if (productoActual.stock === 0) {
-                mensajeError += '- ' + itemCarrito.nombre + ' está AGOTADO\n';
-              } else {
-                mensajeError += '- ' + itemCarrito.nombre + ' solo tiene ' + productoActual.stock + ' disponible(s)\n';
-              }
-            }
-          });
-          
-          if (!stockValido) {
-            alert('⚠️ No se puede procesar el pedido:\n\n' + mensajeError + '\nPor favor, actualiza tu carrito.');
-            btnSubmit.disabled = false;
-            btnSubmit.textContent = 'Finalizar Compra';
-            // Actualizar productos locales
-            productos = productosActualizados;
-            return;
-          }
-          
-          // Si el stock es válido, procesar el pedido
-          btnSubmit.textContent = 'Procesando pedido...';
-          google.script.run
-            .withSuccessHandler(function(resultado) {
-              if (resultado.success) { 
-                ultimoPedido.id = resultado.idPedido; 
-                mostrarExito(resultado.idPedido); 
-                carrito = []; 
-                actualizarContadorCarrito();
-                // Actualizar productos locales con el nuevo stock
-                productos = productosActualizados.map(p => {
-                  const itemComprado = ultimoPedido.productos.find(item => item.id === p.id);
-                  if (itemComprado) {
-                    return {...p, stock: p.stock - itemComprado.cantidad};
-                  }
-                  return p;
-                });
-              }
-              else { 
-                alert('Error: ' + resultado.error); 
-                btnSubmit.disabled = false; 
-                btnSubmit.textContent = 'Finalizar Compra'; 
-              }
-            })
-            .withFailureHandler(function(error) { 
-              alert('Error: ' + error.message); 
-              btnSubmit.disabled = false; 
-              btnSubmit.textContent = 'Finalizar Compra'; 
-            })
-            .procesarPedido(datosCliente, carrito);
-        })
-        .withFailureHandler(function(error) {
-          alert('Error al verificar stock: ' + error.message);
-          btnSubmit.disabled = false;
-          btnSubmit.textContent = 'Finalizar Compra';
-        })
-        .obtenerProductos();
+      try {
+        // Enviar pedido a la API
+        console.log('📦 Enviando pedido a /api/pedidos...');
+        
+        const response = await fetch('/api/pedidos', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            cliente: datosCliente,
+            productos: carrito.map(item => ({
+              id: item.id,
+              nombre: item.nombre,
+              cantidad: item.cantidad,
+              precioBase: item.precioBase,
+              itbmsPorc: item.itbmsPorc,
+              itbmsMonto: item.itbmsMonto,
+              precioFinal: item.precioFinal
+            }))
+          })
+        });
+        
+        const resultado = await response.json();
+        
+        if (!resultado.success) {
+          throw new Error(resultado.error || 'Error al procesar el pedido');
+        }
+        
+        console.log('✅ Pedido procesado exitosamente:', resultado.pedido.id);
+        
+        // Guardar pedido para WhatsApp
+        ultimoPedido = { 
+          id: resultado.pedido.id,
+          cliente: datosCliente, 
+          productos: [...carrito], 
+          fecha: new Date().toLocaleDateString('es-PA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), 
+          hora: new Date().toLocaleTimeString('es-PA', { hour: '2-digit', minute: '2-digit' }),
+          total: resultado.pedido.total,
+          subtotal: resultado.pedido.subtotal,
+          itbms: resultado.pedido.itbms
+        };
+        
+        // Mostrar éxito
+        mostrarExito(resultado.pedido.id);
+        
+        // Limpiar carrito
+        carrito = [];
+        actualizarContadorCarrito();
+        
+      } catch (error) {
+        console.error('❌ Error al procesar pedido:', error);
+        
+        if (error.message.includes('AGOTADO') || error.message.includes('disponible')) {
+          alert('⚠️ Error de stock:\n\n' + error.message + '\n\nPor favor, actualiza la página y revisa el stock disponible.');
+        } else {
+          alert('❌ Error al procesar el pedido:\n\n' + error.message + '\n\nIntenta de nuevo o contacta al vendedor.');
+        }
+        
+        btnSubmit.disabled = false;
+        btnSubmit.textContent = 'Finalizar Compra';
+      }
     }
 
     function codificarTextoWhatsApp(texto) { return encodeURIComponent(texto).replace(/[!'()*]/g, function(c) { return '%' + c.charCodeAt(0).toString(16); }); }
@@ -958,24 +959,22 @@
       actualizarContadorCarrito(); 
       cerrarCarrito(); 
       
-      // Mostrar loading mientras se recargan los productos
       document.getElementById('productosGrid').innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 60px;"><div class="spinner" style="margin: 0 auto 20px;"></div><p>Actualizando inventario...</p></div>';
       
-      // Recargar productos desde el servidor para obtener el stock actualizado
-      google.script.run
-        .withSuccessHandler(function(data) {
-          if (data && data.length > 0) {
-            productos = data;
+      fetch('/api/productos')
+        .then(res => res.json())
+        .then(resultado => {
+          if (resultado.success && resultado.productos && resultado.productos.length > 0) {
+            productos = resultado.productos;
             mostrarProductos();
-            aplicarFiltro(); // Re-aplicar filtro si había uno activo
+            aplicarFiltro();
           }
           window.scrollTo({top:0,behavior:'smooth'});
         })
-        .withFailureHandler(function(error) {
+        .catch(error => {
           console.error('Error al recargar productos:', error);
-          location.reload(); // Si falla, recargar la página completa
-        })
-        .obtenerProductos();
+          location.reload();
+        });
     }
   </script>
 </body>
