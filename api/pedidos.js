@@ -75,7 +75,10 @@ module.exports = async (req, res) => {
 
     const sheets = getSheetsClient();
     const idPedido = 'TZ-' + Date.now();
+    
+    // Usar zona horaria de Panamá (America/Panama = UTC-5)
     const fecha = new Date().toLocaleString('es-PA', { 
+      timeZone: 'America/Panama',
       year: 'numeric', 
       month: '2-digit', 
       day: '2-digit', 
