@@ -76,17 +76,17 @@ module.exports = async (req, res) => {
     const sheets = getSheetsClient();
     const idPedido = 'TZ-' + Date.now();
     
-    // Usar zona horaria de Panamá (America/Panama = UTC-5)
-    const fecha = new Date().toLocaleString('es-PA', { 
-      timeZone: 'America/Panama',
-      year: 'numeric', 
-      month: '2-digit', 
-      day: '2-digit', 
-      hour: '2-digit', 
-      minute: '2-digit', 
-      second: '2-digit' 
-    });
-    
+    // Generar fecha en formato YYYY-MM-DD para Google Sheets (Panamá UTC-5)
+    const ahora = new Date();
+    const panamaOffset = -5 * 60; // UTC-5 en minutos
+    const localOffset = ahora.getTimezoneOffset(); // Offset del servidor
+    const panamaTime = new Date(ahora.getTime() + (localOffset + panamaOffset) * 60000);
+
+    const year = panamaTime.getFullYear();
+    const month = String(panamaTime.getMonth() + 1).padStart(2, '0');
+    const day = String(panamaTime.getDate()).padStart(2, '0');
+
+    const fecha = `${year}-${month}-${day}`; // YYYY-MM-DD    
     // 3. Calcular totales
     let subtotal = 0;
     let totalITBMS = 0;
