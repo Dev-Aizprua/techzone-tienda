@@ -86,7 +86,7 @@ module.exports = async (req, res) => {
     const month = String(panamaTime.getMonth() + 1).padStart(2, '0');
     const day = String(panamaTime.getDate()).padStart(2, '0');
 
-    const fecha = `${year}-${month}-${day}`; // YYYY-MM-DD    
+    const fecha = `${month}/${day}/${year}`; // MM/DD/YYYY   
     // 3. Calcular totales
     let subtotal = 0;
     let totalITBMS = 0;
