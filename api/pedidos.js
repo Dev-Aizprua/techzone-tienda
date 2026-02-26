@@ -113,7 +113,7 @@ module.exports = async (req, res) => {
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
       range: 'Pedidos!A:J',
-      valueInputOption: 'RAW',
+      valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [[
           fecha,
@@ -162,7 +162,7 @@ module.exports = async (req, res) => {
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
       range: 'DetallePedidos!A:I',
-      valueInputOption: 'RAW',
+      valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: detalles
       }
@@ -182,7 +182,7 @@ module.exports = async (req, res) => {
       await sheets.spreadsheets.values.update({
         spreadsheetId: SHEET_ID,
         range: `Productos!G${filaIndex}`,
-        valueInputOption: 'RAW',
+        valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [[nuevoStock]]
         }
