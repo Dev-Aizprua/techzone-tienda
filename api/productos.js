@@ -3,11 +3,9 @@ const { getProductos } = require('../lib/sheets');
 
 // ✅ Tu dominio real de Vercel
 const DOMINIOS_PERMITIDOS = [
-  'https://tu-tienda.vercel.app',    // ← Cambia por tu URL real
-  'https://www.tudominio.com',       // ← Si tienes dominio propio
-  'http://localhost:3000'            // ← Solo para desarrollo
+  'https://techzone-tienda.vercel.app',
+  'http://localhost:3000'
 ];
-
 function configurarCORS(req, res) {
   const origin = req.headers.origin;
   if (DOMINIOS_PERMITIDOS.includes(origin)) {

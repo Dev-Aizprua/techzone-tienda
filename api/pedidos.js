@@ -3,11 +3,9 @@ const { getProductos, SHEET_ID } = require('../lib/sheets');
 const { google } = require('googleapis');
 
 const DOMINIOS_PERMITIDOS = [
-  'https://tu-tienda.vercel.app',
-  'https://www.tudominio.com',
+  'https://techzone-tienda.vercel.app',
   'http://localhost:3000'
 ];
-
 // ✅ Rate limiting simple en memoria
 const rateLimitMap = new Map();
 const LIMITE_PEDIDOS  = 5;   // máximo 5 pedidos
