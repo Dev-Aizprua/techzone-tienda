@@ -1,0 +1,9 @@
+doaqu6s6c           nombre de la nube
+
+978137972327483     Clave Api
+
+**********          Secreto de api
+
+
+CLOUDINARY_URL=cloudinary://978137972327483:**********@doaqu6s6c    
+Variable de entorno api           
