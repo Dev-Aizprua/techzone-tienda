@@ -225,13 +225,12 @@ module.exports = async (req, res) => {
       success: true,
       pedido: { id: idPedido, fecha, total, subtotal, itbms: totalITBMS, estado: 'Pendiente' }
     });
-
-  } catch (error) {
-    // ✅ Error genérico al cliente
-    console.error('Error en /api/pedidos:', error.message);
-    return res.status(500).json({
-      success: false,
-      error: 'Error al procesar el pedido. Intenta de nuevo.'
-    });
-  }
-};
+// Temporal para identificar el error
+} catch (error) {
+  console.error('Error completo:', error);
+  return res.status(500).json({
+    success: false,
+    error: error.message  // ← Temporal para ver el error real
+  });
+}
+  };
