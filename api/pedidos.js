@@ -1,83 +1,60 @@
-javascript// api/pedidos.js - VERSIÓN SEGURA
-const { getProductos, SHEET_ID } = require('../lib/sheets');
+// api/pedidos.js - VERSIÓN SEGURA
+const { getProductos } = require('../lib/sheets');
 const { google } = require('googleapis');
+const SHEET_ID = process.env.SHEET_ID;
 
 const DOMINIOS_PERMITIDOS = [
   'https://techzone-tienda.vercel.app',
   'http://localhost:3000'
 ];
-// ✅ Rate limiting simple en memoria
+
 const rateLimitMap = new Map();
-const LIMITE_PEDIDOS  = 5;   // máximo 5 pedidos
-const VENTANA_TIEMPO  = 60 * 60 * 1000; // por hora
+const LIMITE_PEDIDOS = 5;
+const VENTANA_TIEMPO = 60 * 60 * 1000;
 
 function verificarRateLimit(ip) {
   const ahora    = Date.now();
   const registro = rateLimitMap.get(ip);
-
   if (!registro || ahora - registro.inicio > VENTANA_TIEMPO) {
     rateLimitMap.set(ip, { count: 1, inicio: ahora });
     return true;
   }
-
   if (registro.count >= LIMITE_PEDIDOS) return false;
-
   registro.count++;
   return true;
 }
 
-// ✅ Validación completa del cliente
 function validarCliente(cliente) {
   const errores = [];
+  if (!cliente) return ['Datos del cliente requeridos'];
 
-  if (!cliente) {
-    return ['Datos del cliente requeridos'];
-  }
-
-  const nombre = (cliente.nombre || '').trim();
-  const email  = (cliente.email  || '').trim();
+  const nombre = (cliente.nombre   || '').trim();
+  const email  = (cliente.email    || '').trim();
   const tel    = (cliente.telefono  || '').trim();
   const dir    = (cliente.direccion || '').trim();
 
-  if (!nombre || nombre.length < 2)
-    errores.push('Nombre requerido (mínimo 2 caracteres)');
-  if (nombre.length > 100)
-    errores.push('Nombre demasiado largo');
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!email || !emailRegex.test(email))
-    errores.push('Email no válido');
-
-  if (!tel || tel.length < 7)
-    errores.push('Teléfono requerido');
-
-  if (!dir || dir.length < 10)
-    errores.push('Dirección requerida (mínimo 10 caracteres)');
+  if (!nombre || nombre.length < 2)  errores.push('Nombre requerido');
+  if (nombre.length > 100)           errores.push('Nombre demasiado largo');
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+                                     errores.push('Email no válido');
+  if (!tel || tel.length < 7)        errores.push('Teléfono requerido');
+  if (!dir || dir.length < 10)       errores.push('Dirección requerida');
 
   return errores;
 }
 
-// ✅ Validación de productos del pedido
 function validarProductosPedido(productos) {
-  const errores = [];
-
-  if (!productos || !Array.isArray(productos) || productos.length === 0) {
+  if (!productos || !Array.isArray(productos) || productos.length === 0)
     return ['El carrito está vacío'];
-  }
-
-  if (productos.length > 20) {
+  if (productos.length > 20)
     return ['Demasiados productos en el pedido'];
-  }
 
+  const errores = [];
   productos.forEach((item, i) => {
-    if (!item.id)
-      errores.push(`Producto ${i+1}: ID requerido`);
-    if (!item.cantidad || item.cantidad < 1 || item.cantidad > 99)
-      errores.push(`Producto ${i+1}: Cantidad inválida`);
-    if (item.precioBase < 0)
-      errores.push(`Producto ${i+1}: Precio inválido`);
+    if (!item.id)                                    errores.push(`Producto ${i+1}: ID requerido`);
+    if (!item.cantidad || item.cantidad < 1 || item.cantidad > 99) errores.push(`Producto ${i+1}: Cantidad inválida`);
+    if (item.precioBase < 0)                         errores.push(`Producto ${i+1}: Precio inválido`);
   });
-
   return errores;
 }
 
@@ -102,6 +79,7 @@ function getSheetsClient() {
   return google.sheets({ version: 'v4', auth: getAuth() });
 }
 
+// ✅ EXPORT CORRECTO - Todo dentro de una sola función
 module.exports = async (req, res) => {
   configurarCORS(req, res);
 
@@ -110,37 +88,24 @@ module.exports = async (req, res) => {
     return res.status(405).json({ success: false, error: 'Método no permitido' });
   }
 
-  // ✅ Verificar rate limit por IP
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
   if (!verificarRateLimit(ip)) {
-    return res.status(429).json({
-      success: false,
-      error: 'Demasiados pedidos. Intenta más tarde.'
-    });
+    return res.status(429).json({ success: false, error: 'Demasiados pedidos. Intenta más tarde.' });
   }
 
   try {
     const { cliente, productos } = req.body;
 
-    // ✅ Validar cliente
     const erroresCliente = validarCliente(cliente);
     if (erroresCliente.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: erroresCliente.join(', ')
-      });
+      return res.status(400).json({ success: false, error: erroresCliente.join(', ') });
     }
 
-    // ✅ Validar productos
     const erroresProductos = validarProductosPedido(productos);
     if (erroresProductos.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: erroresProductos.join(', ')
-      });
+      return res.status(400).json({ success: false, error: erroresProductos.join(', ') });
     }
 
-    // Verificar stock
     const productosActuales = await getProductos();
     let mensajeError = '';
 
@@ -162,16 +127,14 @@ module.exports = async (req, res) => {
     const sheets   = getSheetsClient();
     const idPedido = 'TZ-' + Date.now();
 
-    // Fecha en zona horaria Panamá
-    const ahora       = new Date();
-    const panamaTime  = new Date(ahora.getTime() + (ahora.getTimezoneOffset() - 300) * 60000);
-    const fecha       = `${String(panamaTime.getMonth()+1).padStart(2,'0')}/${String(panamaTime.getDate()).padStart(2,'0')}/${panamaTime.getFullYear()}`;
+    const ahora      = new Date();
+    const panamaTime = new Date(ahora.getTime() + (ahora.getTimezoneOffset() - 300) * 60000);
+    const fecha      = `${String(panamaTime.getMonth()+1).padStart(2,'0')}/${String(panamaTime.getDate()).padStart(2,'0')}/${panamaTime.getFullYear()}`;
 
-    // Calcular totales
     let subtotal = 0, totalITBMS = 0;
     productos.forEach(item => {
-      subtotal    += item.precioBase * item.cantidad;
-      totalITBMS  += item.itbmsMonto * item.cantidad;
+      subtotal   += item.precioBase * item.cantidad;
+      totalITBMS += item.itbmsMonto * item.cantidad;
     });
     const total = subtotal + totalITBMS;
 
@@ -218,19 +181,25 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ✅ Log sin datos sensibles
-    console.log(`✅ Pedido ${idPedido} procesado - Total: $${total.toFixed(2)}`);
+    console.log(`Pedido ${idPedido} - Total: $${total.toFixed(2)}`);
 
     return res.status(200).json({
       success: true,
-      pedido: { id: idPedido, fecha, total, subtotal, itbms: totalITBMS, estado: 'Pendiente' }
+      pedido: {
+        id:       idPedido,
+        fecha,
+        total,
+        subtotal,
+        itbms:    totalITBMS,
+        estado:   'Pendiente'
+      }
     });
-// Temporal para identificar el error
-} catch (error) {
-  console.error('Error completo:', error);
-  return res.status(500).json({
-    success: false,
-    error: error.message  // ← Temporal para ver el error real
-  });
-}
-  };
+
+  } catch (error) {
+    console.error('Error en pedidos:', error.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Error al procesar el pedido. Intenta de nuevo.'
+    });
+  }
+};
