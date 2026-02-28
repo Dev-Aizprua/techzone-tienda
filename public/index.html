@@ -1040,9 +1040,24 @@
     }
 
     function enviarWhatsAppPedido() {
-      window.open('https://wa.me/50764230862?text=' + generarMensajeWhatsApp(), '_blank');
+  window.open('https://wa.me/50764230862?text=' + generarMensajeWhatsApp(), '_blank');
+  
+  function actualizarAlRegresar() {
+    if (!document.hidden) {
+      document.removeEventListener('visibilitychange', actualizarAlRegresar);
+      fetch('/api/productos')
+        .then(r => r.json())
+        .then(res => {
+          if (res.success && res.productos?.length > 0) {
+            productos = res.productos;
+          }
+        })
+        .catch(err => console.error('Error:', err));
     }
-
+  }
+  
+  document.addEventListener('visibilitychange', actualizarAlRegresar);
+}
     function mostrarExito(idPedido) {
       document.getElementById('carritoBody').innerHTML =
         '<div class="success-message">' +
