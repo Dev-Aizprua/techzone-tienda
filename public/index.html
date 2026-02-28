@@ -267,6 +267,7 @@
     .producto-imagen-container {
       overflow: hidden; position: relative;
       background: linear-gradient(135deg, #f0f5fc 0%, #e8eef7 100%);
+      border-radius: 15px 15px 0 0; /* ← agregar esto */
     }
     .producto-imagen {
       width: 100%; height: 160px; object-fit: cover;
@@ -289,7 +290,7 @@
       border-radius: 6px; box-shadow: 0 4px 12px rgba(229,62,62,0.4);
     }
 
-    .producto-info { padding: 14px; }
+    .producto-info { padding: 14px; padding-right: 16px; }
     .producto-categoria {
       color: var(--primary); font-size: 10px; font-weight: 700;
       text-transform: uppercase; margin-bottom: 6px; letter-spacing: 1.5px;
