@@ -84,7 +84,7 @@
     .logo-section {
       display: flex; align-items: center; gap: 12px;
     }
-    .logo { height: 44px; filter: drop-shadow(0 0 8px rgba(0,212,255,0.4)); }
+    .logo { display: none; }
     .empresa-info { display: flex; flex-direction: column; justify-content: center; }
     .empresa-info h1 {
       font-size: 18px; font-family: 'Syne', sans-serif;
@@ -615,7 +615,7 @@
     /* ========== DESKTOP ========== */
     @media screen and (min-width: 769px) {
       .header-inner { max-width: 1200px; margin: 0 auto; padding: 0 32px; height: 70px; }
-      .logo { height: 48px; }
+      .logo { display: none; }
       .empresa-info h1 { font-size: 22px; letter-spacing: 5px; }
       .hero { padding: 80px 32px 64px; }
       .hero h2 { font-size: 52px; letter-spacing: 4px; }
@@ -650,7 +650,6 @@
   <header id="mainHeader" style="display:none;">
     <div class="header-inner">
       <div class="logo-section">
-        <img src="https://i.postimg.cc/8zRp0Prq/Logo-Tienda-de-articulos-Tecnologicos.png" alt="Logo" class="logo">
         <div class="empresa-info">
           <h1>TECHZONE</h1>
           <span>Tu mundo digital</span>
