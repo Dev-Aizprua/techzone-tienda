@@ -1,5 +1,4 @@
 // functions/api/pedidos.js — Cloudflare Pages Function
-// Usa fetch nativo en lugar de googleapis (más liviano)
 
 const DOMINIOS_PERMITIDOS = [
   'https://techzone-tienda.pages.dev',
@@ -31,7 +30,6 @@ function validarCliente(cliente) {
   const tel    = (cliente.telefono  || '').trim();
   const dir    = (cliente.direccion || '').trim();
   if (!nombre || nombre.length < 2)  errores.push('Nombre requerido');
-  if (nombre.length > 100)           errores.push('Nombre demasiado largo');
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errores.push('Email no válido');
   if (!tel || tel.length < 7)        errores.push('Teléfono requerido');
   if (!dir || dir.length < 10)       errores.push('Dirección requerida');
@@ -39,14 +37,12 @@ function validarCliente(cliente) {
 }
 
 function validarProductosPedido(productos) {
-  if (!productos || !Array.isArray(productos) || productos.length === 0)
-    return ['El carrito está vacío'];
+  if (!productos || !Array.isArray(productos) || productos.length === 0) return ['El carrito está vacío'];
   if (productos.length > 20) return ['Demasiados productos en el pedido'];
   const errores = [];
   productos.forEach((item, i) => {
     if (!item.id) errores.push(`Producto ${i+1}: ID requerido`);
     if (!item.cantidad || item.cantidad < 1 || item.cantidad > 99) errores.push(`Producto ${i+1}: Cantidad inválida`);
-    if (item.precioBase < 0) errores.push(`Producto ${i+1}: Precio inválido`);
   });
   return errores;
 }
@@ -56,6 +52,8 @@ function getCORSHeaders(request) {
   const headers = {};
   if (DOMINIOS_PERMITIDOS.includes(origin)) {
     headers['Access-Control-Allow-Origin'] = origin;
+  } else {
+    headers['Access-Control-Allow-Origin'] = '*';
   }
   headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
   headers['Access-Control-Allow-Headers'] = 'Content-Type';
@@ -64,8 +62,7 @@ function getCORSHeaders(request) {
 
 function jsonResponse(data, status, corsHeaders) {
   return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
 }
 
@@ -76,37 +73,55 @@ function limpiarNumero(valor, porDefecto = 0) {
   return isNaN(numero) ? porDefecto : numero;
 }
 
+const toBase64url = (str) =>
+  btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+
 async function getAccessToken(credentials) {
   const now = Math.floor(Date.now() / 1000);
-  const header = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const payload = btoa(JSON.stringify({
+  const header  = toBase64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const payload = toBase64url(JSON.stringify({
     iss: credentials.client_email,
     scope: 'https://www.googleapis.com/auth/spreadsheets',
     aud: 'https://oauth2.googleapis.com/token',
     exp: now + 3600,
     iat: now
   }));
-  const data = `${header}.${payload}`;
+  const signingInput = `${header}.${payload}`;
+
   const pemKey = credentials.private_key
     .replace('-----BEGIN PRIVATE KEY-----', '')
     .replace('-----END PRIVATE KEY-----', '')
-    .replace(/\n/g, '');
-  const keyData = Uint8Array.from(atob(pemKey), c => c.charCodeAt(0));
+    .replace(/\s/g, '');
+
+  const binaryStr = atob(pemKey);
+  const keyData = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) keyData[i] = binaryStr.charCodeAt(i);
+
   const cryptoKey = await crypto.subtle.importKey(
     'pkcs8', keyData.buffer,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    { name: 'RSASSA-PKCS1-v1_5', hash: { name: 'SHA-256' } },
     false, ['sign']
   );
-  const encoder = new TextEncoder();
-  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, encoder.encode(data));
-  const sig = btoa(String.fromCharCode(...new Uint8Array(signature)));
-  const jwt = `${data}.${sig}`;
+
+  const signatureBuffer = await crypto.subtle.sign(
+    { name: 'RSASSA-PKCS1-v1_5' }, cryptoKey,
+    new TextEncoder().encode(signingInput)
+  );
+
+  const sigArray = new Uint8Array(signatureBuffer);
+  let sigStr = '';
+  for (let i = 0; i < sigArray.length; i++) sigStr += String.fromCharCode(sigArray[i]);
+  const signature = btoa(sigStr).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+
+  const jwt = `${signingInput}.${signature}`;
+
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
   });
   const tokenData = await tokenRes.json();
+  if (!tokenData.access_token) throw new Error(`Token error: ${JSON.stringify(tokenData)}`);
   return tokenData.access_token;
 }
 
@@ -157,17 +172,15 @@ export async function onRequestPost({ request, env }) {
     const token = await getAccessToken(credentials);
     const SHEET_ID = env.SHEET_ID;
 
-    // Obtener productos actuales para verificar stock
     const rows = await sheetsGet(token, SHEET_ID, 'Productos!A2:K100');
     const productosActuales = rows.filter(row => row[0]).map(row => ({
-      id: row[0], nombre: row[1],
-      stock: parseInt(row[6]) || 0
+      id: row[0], nombre: row[1], stock: parseInt(row[6]) || 0
     }));
 
     let mensajeError = '';
     for (const itemPedido of productos) {
       const prod = productosActuales.find(p => p.id === itemPedido.id);
-      if (!prod) { mensajeError += `Producto no encontrado. `; }
+      if (!prod) mensajeError += `Producto no encontrado. `;
       else if (prod.stock < itemPedido.cantidad) {
         mensajeError += prod.stock === 0
           ? `${itemPedido.nombre} está AGOTADO. `
@@ -178,17 +191,17 @@ export async function onRequestPost({ request, env }) {
 
     const idPedido = 'TZ-' + Date.now();
     const ahora = new Date();
-    const panamaTime = new Date(ahora.getTime() + (ahora.getTimezoneOffset() - 300) * 60000);
+    const panamaOffset = -5 * 60;
+    const panamaTime = new Date(ahora.getTime() + (ahora.getTimezoneOffset() + panamaOffset) * 60000);
     const fecha = `${String(panamaTime.getMonth()+1).padStart(2,'0')}/${String(panamaTime.getDate()).padStart(2,'0')}/${panamaTime.getFullYear()}`;
 
     let subtotal = 0, totalITBMS = 0;
     productos.forEach(item => {
-      subtotal   += item.precioBase  * item.cantidad;
-      totalITBMS += item.itbmsMonto * item.cantidad;
+      subtotal   += (item.precioBase  || 0) * item.cantidad;
+      totalITBMS += (item.itbmsMonto || 0) * item.cantidad;
     });
     const total = subtotal + totalITBMS;
 
-    // Guardar pedido
     await sheetsAppend(token, SHEET_ID, 'Pedidos!A:J', [[
       fecha, idPedido,
       cliente.nombre.trim(), cliente.email.trim(),
@@ -196,16 +209,14 @@ export async function onRequestPost({ request, env }) {
       subtotal, totalITBMS, total, 'Pendiente'
     ]]);
 
-    // Guardar detalle
     await sheetsAppend(token, SHEET_ID, 'DetallePedidos!A:I',
       productos.map(item => [
         idPedido, item.id, item.nombre, item.cantidad,
         item.precioBase, item.itbmsPorc, item.itbmsMonto,
-        item.precioFinal, item.precioBase * item.cantidad
+        item.precioFinal, (item.precioBase || 0) * item.cantidad
       ])
     );
 
-    // Reducir stock
     for (const itemPedido of productos) {
       const filaIndex = productosActuales.findIndex(p => p.id === itemPedido.id) + 2;
       const prod = productosActuales.find(p => p.id === itemPedido.id);
@@ -218,7 +229,7 @@ export async function onRequestPost({ request, env }) {
     }, 200, corsHeaders);
 
   } catch (error) {
-    console.error('Error en pedidos:', error.message);
+    console.error('Error en pedidos:', error.message, error.stack);
     return jsonResponse({ success: false, error: 'Error al procesar el pedido. Intenta de nuevo.' }, 500, corsHeaders);
   }
 }
