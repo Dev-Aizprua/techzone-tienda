@@ -1,24 +1,21 @@
 {
   "name": "techzone-tienda",
   "version": "1.0.0",
-  "description": "Tienda e-commerce TechZone — Cloudflare Pages",
+  "description": "Tienda e-commerce TechZone con Google Sheets",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "pages:dev": "wrangler pages dev .next --compatibility-flag=nodejs_compat",
-    "pages:deploy": "wrangler pages deploy .next"
+    "start": "next start"
   },
   "author": "Dev-Aizprua",
   "license": "ISC",
   "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
     "googleapis": "^144.0.0",
-    "google-auth-library": "^9.0.0",
+    "micro": "^10.0.1",
     "next": "13.5.6",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
-  },
-  "devDependencies": {
-    "wrangler": "^3.0.0"
   }
 }
