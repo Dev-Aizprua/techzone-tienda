@@ -1,0 +1,25 @@
+# wrangler.toml — Cloudflare Pages + Functions
+# Documentación: https://developers.cloudflare.com/pages/
+
+name = "techzone-tienda"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ─── Build ───────────────────────────────────────────────────────────────────
+[build]
+command = "npm run build"
+output_dir = ".next"          # Next.js build output
+# Si usas export estático: output_dir = "out"
+
+# ─── Variables de entorno (NO secretos) ─────────────────────────────────────
+# Los secretos (GOOGLE_CREDENTIALS, SHEET_ID) se configuran en el
+# Dashboard de Cloudflare Pages → Settings → Environment variables
+# NO los pongas aquí — este archivo va a GitHub
+
+[vars]
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME = "doaqu6s6c"
+NEXT_PUBLIC_CLOUDINARY_PRESET = "tienda"
+NODE_ENV = "production"
+
+# ─── Desarrollo local ────────────────────────────────────────────────────────
+# Para desarrollo local usa: wrangler pages dev .next --compatibility-flag=nodejs_compat
