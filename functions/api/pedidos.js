@@ -1,28 +1,18 @@
 // functions/api/pedidos.js — Cloudflare Pages Function
-// Reemplaza: api/pedidos.js (Vercel)
-// Cambios clave:
-//   - (req,res) → onRequestPost({request, env})
-//   - res.status(x).json() → new Response(JSON.stringify(), {status:x})
-//   - req.headers['x-forwarded-for'] → request.headers.get('CF-Connecting-IP')
-//   - req.body → await request.json()
-
-import { getProductos } from '../../lib/sheets.js';
-import { GoogleAuth } from 'google-auth-library';
-import { google } from 'googleapis';
+// Usa fetch nativo en lugar de googleapis (más liviano)
 
 const DOMINIOS_PERMITIDOS = [
-  'https://techzone-tienda.pages.dev',   // ← tu dominio Cloudflare Pages
-  'https://techzone-tienda.vercel.app',  // mantener durante transición
+  'https://techzone-tienda.pages.dev',
+  'https://techzone-tienda.vercel.app',
   'http://localhost:3000'
 ];
 
-// ─── Rate Limiting (en memoria, se resetea por instancia) ───────────────────
 const rateLimitMap = new Map();
 const LIMITE_PEDIDOS = 5;
 const VENTANA_TIEMPO = 60 * 60 * 1000;
 
 function verificarRateLimit(ip) {
-  const ahora    = Date.now();
+  const ahora = Date.now();
   const registro = rateLimitMap.get(ip);
   if (!registro || ahora - registro.inicio > VENTANA_TIEMPO) {
     rateLimitMap.set(ip, { count: 1, inicio: ahora });
@@ -33,42 +23,34 @@ function verificarRateLimit(ip) {
   return true;
 }
 
-// ─── Validaciones ───────────────────────────────────────────────────────────
 function validarCliente(cliente) {
   const errores = [];
   if (!cliente) return ['Datos del cliente requeridos'];
-
-  const nombre = (cliente.nombre    || '').trim();
-  const email  = (cliente.email     || '').trim();
+  const nombre = (cliente.nombre   || '').trim();
+  const email  = (cliente.email    || '').trim();
   const tel    = (cliente.telefono  || '').trim();
   const dir    = (cliente.direccion || '').trim();
-
   if (!nombre || nombre.length < 2)  errores.push('Nombre requerido');
   if (nombre.length > 100)           errores.push('Nombre demasiado largo');
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-                                     errores.push('Email no válido');
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errores.push('Email no válido');
   if (!tel || tel.length < 7)        errores.push('Teléfono requerido');
   if (!dir || dir.length < 10)       errores.push('Dirección requerida');
-
   return errores;
 }
 
 function validarProductosPedido(productos) {
   if (!productos || !Array.isArray(productos) || productos.length === 0)
     return ['El carrito está vacío'];
-  if (productos.length > 20)
-    return ['Demasiados productos en el pedido'];
-
+  if (productos.length > 20) return ['Demasiados productos en el pedido'];
   const errores = [];
   productos.forEach((item, i) => {
-    if (!item.id)                                          errores.push(`Producto ${i+1}: ID requerido`);
+    if (!item.id) errores.push(`Producto ${i+1}: ID requerido`);
     if (!item.cantidad || item.cantidad < 1 || item.cantidad > 99) errores.push(`Producto ${i+1}: Cantidad inválida`);
-    if (item.precioBase < 0)                               errores.push(`Producto ${i+1}: Precio inválido`);
+    if (item.precioBase < 0) errores.push(`Producto ${i+1}: Precio inválido`);
   });
   return errores;
 }
 
-// ─── CORS ───────────────────────────────────────────────────────────────────
 function getCORSHeaders(request) {
   const origin = request.headers.get('Origin') || '';
   const headers = {};
@@ -87,27 +69,78 @@ function jsonResponse(data, status, corsHeaders) {
   });
 }
 
-// ─── Google Sheets Auth (usando env de Cloudflare) ──────────────────────────
-function getSheetsClient(env) {
-  const credentials = JSON.parse(env.GOOGLE_CREDENTIALS);
-  const auth = new GoogleAuth({
-    credentials,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
-  return google.sheets({ version: 'v4', auth });
+function limpiarNumero(valor, porDefecto = 0) {
+  if (!valor) return porDefecto;
+  const str = valor.toString().trim().replace(/[$€£¥₡%,\s]/g, '').replace(/[^0-9.]/g, '');
+  const numero = parseFloat(str);
+  return isNaN(numero) ? porDefecto : numero;
 }
 
-// ─── Handler principal ───────────────────────────────────────────────────────
+async function getAccessToken(credentials) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const payload = btoa(JSON.stringify({
+    iss: credentials.client_email,
+    scope: 'https://www.googleapis.com/auth/spreadsheets',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now
+  }));
+  const data = `${header}.${payload}`;
+  const pemKey = credentials.private_key
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\n/g, '');
+  const keyData = Uint8Array.from(atob(pemKey), c => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8', keyData.buffer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false, ['sign']
+  );
+  const encoder = new TextEncoder();
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, encoder.encode(data));
+  const sig = btoa(String.fromCharCode(...new Uint8Array(signature)));
+  const jwt = `${data}.${sig}`;
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+  });
+  const tokenData = await tokenRes.json();
+  return tokenData.access_token;
+}
+
+async function sheetsGet(token, sheetId, range) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const data = await res.json();
+  return data.values || [];
+}
+
+async function sheetsAppend(token, sheetId, range, values) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW`;
+  await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values })
+  });
+}
+
+async function sheetsUpdate(token, sheetId, range, value) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+  await fetch(url, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: [[value]] })
+  });
+}
+
 export async function onRequestPost({ request, env }) {
   const corsHeaders = getCORSHeaders(request);
-
-  // IP desde Cloudflare (más confiable que x-forwarded-for)
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+
   if (!verificarRateLimit(ip)) {
-    return jsonResponse(
-      { success: false, error: 'Demasiados pedidos. Intenta más tarde.' },
-      429, corsHeaders
-    );
+    return jsonResponse({ success: false, error: 'Demasiados pedidos. Intenta más tarde.' }, 429, corsHeaders);
   }
 
   try {
@@ -115,42 +148,38 @@ export async function onRequestPost({ request, env }) {
     const { cliente, productos } = body;
 
     const erroresCliente = validarCliente(cliente);
-    if (erroresCliente.length > 0) {
-      return jsonResponse({ success: false, error: erroresCliente.join(', ') }, 400, corsHeaders);
-    }
+    if (erroresCliente.length > 0) return jsonResponse({ success: false, error: erroresCliente.join(', ') }, 400, corsHeaders);
 
     const erroresProductos = validarProductosPedido(productos);
-    if (erroresProductos.length > 0) {
-      return jsonResponse({ success: false, error: erroresProductos.join(', ') }, 400, corsHeaders);
-    }
+    if (erroresProductos.length > 0) return jsonResponse({ success: false, error: erroresProductos.join(', ') }, 400, corsHeaders);
 
-    // Verificar stock actual
-    const productosActuales = await getProductos(env);
+    const credentials = JSON.parse(env.GOOGLE_CREDENTIALS);
+    const token = await getAccessToken(credentials);
+    const SHEET_ID = env.SHEET_ID;
+
+    // Obtener productos actuales para verificar stock
+    const rows = await sheetsGet(token, SHEET_ID, 'Productos!A2:K100');
+    const productosActuales = rows.filter(row => row[0]).map(row => ({
+      id: row[0], nombre: row[1],
+      stock: parseInt(row[6]) || 0
+    }));
+
     let mensajeError = '';
-
     for (const itemPedido of productos) {
-      const productoActual = productosActuales.find(p => p.id === itemPedido.id);
-      if (!productoActual) {
-        mensajeError += `Producto no encontrado. `;
-      } else if (productoActual.stock < itemPedido.cantidad) {
-        mensajeError += productoActual.stock === 0
+      const prod = productosActuales.find(p => p.id === itemPedido.id);
+      if (!prod) { mensajeError += `Producto no encontrado. `; }
+      else if (prod.stock < itemPedido.cantidad) {
+        mensajeError += prod.stock === 0
           ? `${itemPedido.nombre} está AGOTADO. `
-          : `${itemPedido.nombre} solo tiene ${productoActual.stock} disponible(s). `;
+          : `${itemPedido.nombre} solo tiene ${prod.stock} disponible(s). `;
       }
     }
+    if (mensajeError) return jsonResponse({ success: false, error: mensajeError.trim() }, 400, corsHeaders);
 
-    if (mensajeError) {
-      return jsonResponse({ success: false, error: mensajeError.trim() }, 400, corsHeaders);
-    }
-
-    const sheets   = getSheetsClient(env);
-    const SHEET_ID = env.SHEET_ID;
     const idPedido = 'TZ-' + Date.now();
-
-    // Fecha en zona horaria Panamá UTC-5
-    const ahora      = new Date();
+    const ahora = new Date();
     const panamaTime = new Date(ahora.getTime() + (ahora.getTimezoneOffset() - 300) * 60000);
-    const fecha      = `${String(panamaTime.getMonth()+1).padStart(2,'0')}/${String(panamaTime.getDate()).padStart(2,'0')}/${panamaTime.getFullYear()}`;
+    const fecha = `${String(panamaTime.getMonth()+1).padStart(2,'0')}/${String(panamaTime.getDate()).padStart(2,'0')}/${panamaTime.getFullYear()}`;
 
     let subtotal = 0, totalITBMS = 0;
     productos.forEach(item => {
@@ -160,74 +189,40 @@ export async function onRequestPost({ request, env }) {
     const total = subtotal + totalITBMS;
 
     // Guardar pedido
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SHEET_ID,
-      range: 'Pedidos!A:J',
-      valueInputOption: 'RAW',
-      requestBody: {
-        values: [[
-          fecha, idPedido,
-          cliente.nombre.trim(), cliente.email.trim(),
-          cliente.telefono.trim(), cliente.direccion.trim(),
-          subtotal, totalITBMS, total, 'Pendiente'
-        ]]
-      }
-    });
+    await sheetsAppend(token, SHEET_ID, 'Pedidos!A:J', [[
+      fecha, idPedido,
+      cliente.nombre.trim(), cliente.email.trim(),
+      cliente.telefono.trim(), cliente.direccion.trim(),
+      subtotal, totalITBMS, total, 'Pendiente'
+    ]]);
 
-    // Guardar detalle de pedido
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SHEET_ID,
-      range: 'DetallePedidos!A:I',
-      valueInputOption: 'USER_ENTERED',
-      requestBody: {
-        values: productos.map(item => [
-          idPedido, item.id, item.nombre, item.cantidad,
-          item.precioBase, item.itbmsPorc, item.itbmsMonto,
-          item.precioFinal, item.precioBase * item.cantidad
-        ])
-      }
-    });
+    // Guardar detalle
+    await sheetsAppend(token, SHEET_ID, 'DetallePedidos!A:I',
+      productos.map(item => [
+        idPedido, item.id, item.nombre, item.cantidad,
+        item.precioBase, item.itbmsPorc, item.itbmsMonto,
+        item.precioFinal, item.precioBase * item.cantidad
+      ])
+    );
 
-    // Reducir stock en Google Sheets
+    // Reducir stock
     for (const itemPedido of productos) {
-      const productoActual = productosActuales.find(p => p.id === itemPedido.id);
-      const filaIndex      = productosActuales.findIndex(p => p.id === itemPedido.id) + 2;
-      const nuevoStock     = productoActual.stock - itemPedido.cantidad;
-
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: SHEET_ID,
-        range: `Productos!G${filaIndex}`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: { values: [[nuevoStock]] }
-      });
+      const filaIndex = productosActuales.findIndex(p => p.id === itemPedido.id) + 2;
+      const prod = productosActuales.find(p => p.id === itemPedido.id);
+      await sheetsUpdate(token, SHEET_ID, `Productos!G${filaIndex}`, prod.stock - itemPedido.cantidad);
     }
-
-    console.log(`Pedido ${idPedido} - Total: $${total.toFixed(2)}`);
 
     return jsonResponse({
       success: true,
-      pedido: {
-        id:      idPedido,
-        fecha,
-        total,
-        subtotal,
-        itbms:   totalITBMS,
-        estado:  'Pendiente'
-      }
+      pedido: { id: idPedido, fecha, total, subtotal, itbms: totalITBMS, estado: 'Pendiente' }
     }, 200, corsHeaders);
 
   } catch (error) {
     console.error('Error en pedidos:', error.message);
-    return jsonResponse(
-      { success: false, error: 'Error al procesar el pedido. Intenta de nuevo.' },
-      500, corsHeaders
-    );
+    return jsonResponse({ success: false, error: 'Error al procesar el pedido. Intenta de nuevo.' }, 500, corsHeaders);
   }
 }
 
 export async function onRequestOptions({ request }) {
-  return new Response(null, {
-    status: 200,
-    headers: getCORSHeaders(request),
-  });
+  return new Response(null, { status: 200, headers: getCORSHeaders(request) });
 }
