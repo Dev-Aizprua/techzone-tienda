@@ -12,7 +12,6 @@ function getCORSHeaders(request) {
   if (DOMINIOS_PERMITIDOS.includes(origin)) {
     headers['Access-Control-Allow-Origin'] = origin;
   } else {
-    // Permitir en pages.dev (cualquier subdominio de preview)
     headers['Access-Control-Allow-Origin'] = '*';
   }
   headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS';
@@ -22,7 +21,31 @@ function getCORSHeaders(request) {
 
 function limpiarNumero(valor, porDefecto = 0) {
   if (!valor) return porDefecto;
-  const str = valor.toString().trim().replace(/[$€£¥₡%,\s]/g, '').replace(/[^0-9.]/g, '');
+  let str = valor.toString().trim();
+  
+  // Eliminar símbolos de moneda y espacios
+  str = str.replace(/[$€£¥₡%\s]/g, '');
+  
+  // Detectar formato: si tiene coma Y punto, la coma es separador de miles
+  // Ejemplo: 1,299.00 → 1299.00
+  if (str.includes(',') && str.includes('.')) {
+    str = str.replace(/,/g, ''); // eliminar comas (separador de miles)
+  } else if (str.includes(',') && !str.includes('.')) {
+    // Solo tiene coma: puede ser decimal europeo (1,29) o miles (1,299)
+    const partes = str.split(',');
+    const ultimaParte = partes[partes.length - 1];
+    if (ultimaParte.length === 2) {
+      // Es decimal: 1,29 → 1.29
+      str = str.replace(',', '.');
+    } else {
+      // Es miles: 1,299 → 1299
+      str = str.replace(/,/g, '');
+    }
+  }
+  
+  // Eliminar cualquier caracter que no sea número o punto
+  str = str.replace(/[^0-9.]/g, '');
+  
   const numero = parseFloat(str);
   return isNaN(numero) ? porDefecto : numero;
 }
