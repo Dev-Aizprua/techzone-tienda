@@ -22,30 +22,37 @@ function getCORSHeaders(request) {
 function limpiarNumero(valor, porDefecto = 0) {
   if (!valor) return porDefecto;
   let str = valor.toString().trim();
-  
-  // Eliminar símbolos de moneda y espacios
   str = str.replace(/[$€£¥₡%\s]/g, '');
-  
-  // Detectar formato: si tiene coma Y punto, la coma es separador de miles
-  // Ejemplo: 1,299.00 → 1299.00
-  if (str.includes(',') && str.includes('.')) {
-    str = str.replace(/,/g, ''); // eliminar comas (separador de miles)
-  } else if (str.includes(',') && !str.includes('.')) {
-    // Solo tiene coma: puede ser decimal europeo (1,29) o miles (1,299)
-    const partes = str.split(',');
-    const ultimaParte = partes[partes.length - 1];
-    if (ultimaParte.length === 2) {
-      // Es decimal: 1,29 → 1.29
+
+  if (str.includes('.') && str.includes(',')) {
+    // Detectar cuál es el último separador (ese es el decimal)
+    const ultimoPunto = str.lastIndexOf('.');
+    const ultimaComa  = str.lastIndexOf(',');
+    if (ultimaComa > ultimoPunto) {
+      // Coma es decimal: 1.299,00 (formato panameño/europeo)
+      str = str.replace(/\./g, '');
       str = str.replace(',', '.');
     } else {
-      // Es miles: 1,299 → 1299
+      // Punto es decimal: 1,299.00 (formato americano)
       str = str.replace(/,/g, '');
     }
+  } else if (str.includes(',') && !str.includes('.')) {
+    const partes = str.split(',');
+    const ultimaParte = partes[partes.length - 1];
+    if (ultimaParte.length <= 2) {
+      str = str.replace(',', '.'); // decimal: 699,00
+    } else {
+      str = str.replace(/,/g, ''); // miles: 1,299
+    }
+  } else if (str.includes('.') && !str.includes(',')) {
+    const partes = str.split('.');
+    const ultimaParte = partes[partes.length - 1];
+    if (ultimaParte.length > 2) {
+      str = str.replace(/\./g, ''); // miles: 1.299
+    }
   }
-  
-  // Eliminar cualquier caracter que no sea número o punto
+
   str = str.replace(/[^0-9.]/g, '');
-  
   const numero = parseFloat(str);
   return isNaN(numero) ? porDefecto : numero;
 }
