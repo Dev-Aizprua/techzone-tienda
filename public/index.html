@@ -613,6 +613,11 @@
       .cart-text { display: none; }
       .cart-btn { padding: 8px 10px; gap: 6px; }
     }
+    /* Pantallas pequeñas: 4 líneas para nombre y descripción */
+    @media screen and (max-width: 380px) {
+      .producto-nombre { -webkit-line-clamp: 4; }
+      .producto-descripcion { -webkit-line-clamp: 4; }
+    }
     @media screen and (min-width: 769px) {
       .header-inner { max-width: 1200px; margin: 0 auto; padding: 0 32px; height: 70px; }
       .logo { display: none; }
